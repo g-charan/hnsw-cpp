@@ -33,7 +33,7 @@ struct Data {
 Data synthetic(std::size_t dim, std::size_t n, std::size_t nq) {
     Data d;
     d.dim = dim; d.n = n; d.nq = nq;
-    d.name = "synthetic gaussian " + std::to_string(n) + "x" + std::to_string(dim);
+    d.name = "synthetic gaussian (adversarial: no cluster structure) " + std::to_string(n) + "x" + std::to_string(dim);
     d.base.resize(dim * n);
     d.query.resize(dim * nq);
     std::mt19937 rng(1234);
@@ -43,18 +43,18 @@ Data synthetic(std::size_t dim, std::size_t n, std::size_t nq) {
     return d;
 }
 
-Data load_sift(const std::string& dir) {
+Data load_sift(const std::string& dir, const std::string& pfx) {
     Data d;
-    auto base = vec::read_fvecs(dir + "/sift_base.fvecs");
-    auto query = vec::read_fvecs(dir + "/sift_query.fvecs");
-    auto gt = vec::read_ivecs(dir + "/sift_groundtruth.ivecs");
+    auto base = vec::read_fvecs(dir + "/" + pfx + "_base.fvecs");
+    auto query = vec::read_fvecs(dir + "/" + pfx + "_query.fvecs");
+    auto gt = vec::read_ivecs(dir + "/" + pfx + "_groundtruth.ivecs");
 
     d.dim = base.dim; d.n = base.count; d.nq = query.count;
     d.base = std::move(base.data);
     d.query = std::move(query.data);
     d.k_truth = gt.dim;
     d.truth.assign(gt.data.begin(), gt.data.end());
-    d.name = "SIFT1M " + std::to_string(d.n) + "x" + std::to_string(d.dim);
+    d.name = pfx + " " + std::to_string(d.n) + "x" + std::to_string(d.dim);
     return d;
 }
 
@@ -76,7 +76,8 @@ void compute_truth(Data& d, std::size_t k) {
 
 int main(int argc, char** argv) {
     const std::size_t k = 10;
-    Data d = argc > 1 ? load_sift(argv[1]) : synthetic(128, 100000, 1000);
+    Data d = argc > 1 ? load_sift(argv[1], argc > 2 ? argv[2] : "sift")
+                      : synthetic(128, 100000, 1000);
 
     std::printf("dataset: %s, %zu queries, k=%zu\n\n", d.name.c_str(), d.nq, k);
 
@@ -118,7 +119,7 @@ int main(int argc, char** argv) {
     for (std::size_t ef : {10, 20, 40, 60, 100, 200, 400}) {
         core::Histogram h;
         double recall = 0;
-        vec::HnswIndex::Scratch s;
+        vec::Scratch s;
         for (std::size_t i = 0; i < d.nq; ++i) {
             const float* q = d.query.data() + i * d.dim;
             const auto t0 = Clock::now();

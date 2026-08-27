@@ -122,7 +122,7 @@ int main() {
         vec::HnswIndex idx(ds.dim, ds.n);
         idx.add_many(ds.data.data(), ds.n);
 
-        vec::HnswIndex::Scratch s;
+        vec::Scratch s;
         for (std::size_t i = 0; i < ds.nq; ++i) {
             const float* q = ds.queries.data() + i * ds.dim;
             auto a = idx.search(q, 10, 50);
