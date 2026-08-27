@@ -13,10 +13,11 @@ endif()
 # only worth anything if the binary they came from can be symbolised.
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g")
 
-add_library(hnsw INTERFACE)
-target_include_directories(hnsw INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_options(hnsw INTERFACE -Wall -Wextra -Wpedantic)
+add_library(hnsw_lib INTERFACE)
+target_include_directories(hnsw_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_options(hnsw_lib INTERFACE -Wall -Wextra -Wpedantic)
 
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(cli)
 add_subdirectory(bench)
