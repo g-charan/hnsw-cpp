@@ -9,6 +9,15 @@
 #define VEC_NEON 0
 #endif
 
+// Escape hatch for benchmarking only. hnswlib's SIMD paths are x86-only, so on
+// aarch64 it runs its scalar fallback; comparing against it with NEON enabled
+// measures the kernels, not the graph. Building this project scalar-only makes
+// the structural comparison apples-to-apples.
+#if defined(VEC_FORCE_SCALAR) && VEC_FORCE_SCALAR
+#undef VEC_NEON
+#define VEC_NEON 0
+#endif
+
 namespace vec {
 
 // Distance kernels over float32 vectors.
