@@ -1,4 +1,4 @@
-foreach(t test_distance test_arena test_histogram test_flat test_fvecs)
+foreach(t test_distance test_arena test_histogram test_flat test_fvecs test_hnsw)
   add_executable(${t} ${t}.cpp)
   target_link_libraries(${t} PRIVATE hnsw)
   target_include_directories(${t} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
