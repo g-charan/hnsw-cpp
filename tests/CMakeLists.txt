@@ -1,0 +1,6 @@
+foreach(t test_distance test_arena test_histogram)
+  add_executable(${t} ${t}.cpp)
+  target_link_libraries(${t} PRIVATE hnsw)
+  target_include_directories(${t} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  add_test(NAME ${t} COMMAND ${t})
+endforeach()
