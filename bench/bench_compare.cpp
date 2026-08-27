@@ -29,7 +29,7 @@ struct Row {
 
 void print_table(const char* label, const std::vector<Row>& rows, double build_s,
                  double mib) {
-    std::printf("\n%s  (build %.1f s, %.0f MiB)\n", label, build_s, mib);
+    std::printf("\n%s  (build %.1f s, %.0f MiB total incl. vectors)\n", label, build_s, mib);
     std::printf("%6s %11s %12s %9s %9s\n", "ef", "recall@10", "QPS", "p50 us", "p99 us");
     for (const Row& r : rows)
         std::printf("%6zu %11.4f %12.0f %9llu %9llu\n", r.ef, r.recall, r.qps,
@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
         const auto t0 = Clock::now();
         idx.add_many(base.data.data(), n);
         mine_build = std::chrono::duration<double>(Clock::now() - t0).count();
-        mine_mib = idx.graph_bytes() / 1048576.0;
+        mine_mib = idx.total_bytes() / 1048576.0;  // vectors included, as hnswlib's is
 
         vec::Scratch s;
         for (std::size_t ef : efs) {

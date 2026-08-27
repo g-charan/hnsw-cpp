@@ -55,6 +55,60 @@ the sum without `-ffast-math`, which this project does not enable.
 There is no AVX2 path. There is no x86 machine here to test one on, and an
 untested SIMD kernel is a correctness risk rather than a feature.
 
+### Search on SIFT1M
+
+1,000,000 x 128 vectors, 10,000 queries, k=10, M=16, ef_construction=200,
+scored against the ground truth the dataset ships.
+`./build/bench/bench_search data/sift sift`
+
+| ef | recall@10 | QPS | p50 | p99 | vs brute force |
+|---|---|---|---|---|---|
+| 10 | 0.7265 | 37,645 | 25 us | 45 us | 275x |
+| 40 | 0.9384 | 14,685 | 69 us | 95 us | 107x |
+| 100 | **0.9866** | **6,817** | 152 us | 196 us | **50x** |
+| 200 | 0.9966 | 3,747 | 276 us | 362 us | 27x |
+| 400 | 0.9988 | 2,060 | 503 us | 671 us | 15x |
+
+Exhaustive search over the same data manages 137 QPS at 7.2 ms per query. The
+index is 626 MiB including vectors, of which the graph is 138 MiB, and builds in
+about 250 s at an average degree of 22.5.
+
+### Against hnswlib
+
+`./build/bench/bench_compare data/sift sift`
+
+Comparing QPS between two approximate indexes is meaningless unless recall is
+held equal, since any index can be made faster by returning worse answers. Both
+are swept across ef and compared at the same recall.
+
+| recall at least | this project | hnswlib 0.8.0 | ratio |
+|---|---|---|---|
+| 0.90 | 14,540 | 8,436 | **1.72x** |
+| 0.95 | 10,310 | 6,127 | **1.68x** |
+| 0.99 | 3,671 | 2,191 | **1.68x** |
+
+Build 250 s against 357 s, and 626 MiB against 748 MiB.
+
+**That comparison is real but it is not a claim about the graph.** hnswlib's
+SIMD kernels are guarded on `__SSE__` and `__AVX__`, which are x86-only, so on
+aarch64 it runs the scalar `L2Sqr` at `space_l2.h:215`. The table above is this
+project's NEON kernels against hnswlib's scalar fallback -- which is genuinely
+what you get on an Apple machine, and is genuinely not an algorithmic win.
+
+So `bench_compare_scalar` builds this project with `VEC_FORCE_SCALAR=1` and runs
+the same sweep, which isolates graph quality from kernel quality:
+
+| recall at least | this project (scalar) | hnswlib 0.8.0 | ratio |
+|---|---|---|---|
+| 0.90 | 9,929 | 10,306 | 0.96x |
+| 0.95 | 7,139 | 7,459 | 0.96x |
+| 0.99 | 2,571 | 2,722 | 0.94x |
+
+The honest reading: the graph is at parity with the reference implementation and
+a few percent behind it, this project reaches slightly higher recall at every ef
+(0.9866 against 0.9829 at ef=100), and the entire advantage on Apple Silicon
+comes from having a NEON path that hnswlib does not.
+
 ### Index open time
 
 `hnsw info` / `MappedIndex`

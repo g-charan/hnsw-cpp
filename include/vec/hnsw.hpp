@@ -291,9 +291,18 @@ public:
         return vec::search(view(), q, k, ef, query_scratch_);
     }
 
+    // Graph structure only: layer 0, the upper lists and their offsets.
     std::size_t graph_bytes() const {
-        return arena_.bytes_reserved() + upper_.size() * sizeof(std::uint32_t);
+        return arena_.bytes_reserved() + upper_.size() * sizeof(std::uint32_t) +
+               upper_off_.size() * sizeof(std::uint64_t);
     }
+
+    // Everything the index holds, vectors included. This is the figure to
+    // compare against another implementation: hnswlib stores vectors inline
+    // with its level-0 links, so its per-element size covers both, and setting
+    // that against a graph-only number would understate this index by the
+    // size of the dataset.
+    std::size_t total_bytes() const { return graph_bytes() + store_.bytes(); }
 
     double average_degree() const {
         if (store_.size() == 0) return 0.0;
