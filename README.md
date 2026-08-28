@@ -16,7 +16,7 @@ vectors ──► HnswIndex ──► binary index file
                             no parse                   NEON L2 kernels
 ```
 
-## Quick start
+## Build, index, query
 
 ```bash
 cmake -S . -B build && cmake --build build -j
@@ -32,7 +32,7 @@ ctest --test-dir build --output-on-failure
 `./tools/get_dataset.sh sift` fetches the full SIFT1M set (~160 MB) used for the
 numbers below.
 
-## Measured numbers
+## Benchmarks
 
 Every figure comes from a benchmark target in this repository, on an Apple M4
 Max with Apple clang 17. Re-run them; they will differ on your hardware.
@@ -122,7 +122,7 @@ Open time is a syscall and a header check, and does not grow with the index.
 The first query is more expensive than later ones because it is what actually
 faults the pages in; that cost is paging, not parsing.
 
-## Design notes
+## Why it is built this way
 
 ### Layer 0 is one flat array
 
@@ -166,7 +166,7 @@ than to any already-chosen neighbour, which spreads edges across directions.
 The same heuristic runs when a node's neighbour list overflows, rather than
 simply dropping the furthest.
 
-## Testing
+## Correctness
 
 ```bash
 ctest --test-dir build --output-on-failure
