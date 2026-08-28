@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Builds the search path to WebAssembly. Requires emscripten (brew install emscripten).
+# Writes into build/wasm by default; pass a directory to send it somewhere else.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-out="$root/web/public"
+out="${1:-$root/build/wasm}"
 mkdir -p "$out"
 
 emcc "$root/wasm/bindings.cpp" \
