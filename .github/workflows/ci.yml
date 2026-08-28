@@ -1,0 +1,17 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build -j
+      # siftsmall is 5 MB and gives the recall test real ground truth. The
+      # runner is x86, so this exercises the scalar path; NEON is covered locally.
+      # The corpus is served over FTP, which runners sometimes block; the
+      # dataset test skips rather than fails when the fetch does not land.
+      - run: ./tools/get_dataset.sh siftsmall
+        continue-on-error: true
+      - run: ctest --test-dir build --output-on-failure --no-tests=error
