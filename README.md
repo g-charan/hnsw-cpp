@@ -18,16 +18,25 @@ vectors ──► HnswIndex ──► binary index file
 
 ## Build, index, query
 
+Needs CMake 3.20+ and a C++23 compiler. No other dependencies; hnswlib is
+vendored and only the comparison benchmark uses it.
+
 ```bash
 cmake -S . -B build && cmake --build build -j
+
+# Fetch this first: without it the real-dataset test reports SKIP rather than
+# running, and that test is the one that scores recall against ground truth.
+./tools/get_dataset.sh siftsmall          # 10k x 128, ~5 MB
 ctest --test-dir build --output-on-failure
 
-./tools/get_dataset.sh siftsmall          # 10k x 128, ~5 MB
 ./build/cli/hnsw build data/siftsmall/siftsmall_base.fvecs small.idx
 ./build/cli/hnsw eval  small.idx \
     data/siftsmall/siftsmall_query.fvecs \
     data/siftsmall/siftsmall_groundtruth.ivecs
 ```
+
+`eval` prints a recall-versus-throughput table; on siftsmall it reaches recall
+1.0000 by ef=200. `hnsw info small.idx` describes an index without loading it.
 
 `./tools/get_dataset.sh sift` fetches the full SIFT1M set (~160 MB) used for the
 numbers below.
@@ -194,9 +203,16 @@ cli/             build / query / eval / info
 bench/           distance, search, and the hnswlib comparison
 tests/           one binary per unit, plus the real-dataset check
 tools/           dataset fetcher
+wasm/            emscripten bindings, so the search path runs in a browser
+third_party/     hnswlib 0.8.0, vendored for the comparison benchmark only
 ```
 
 ## References
 
 Malkov & Yashunin, *Efficient and robust approximate nearest neighbor search
 using Hierarchical Navigable Small World graphs*, 2016.
+
+hnswlib, the reference implementation the benchmarks compare against, is
+vendored under `third_party/hnswlib` at v0.8.0 and used under Apache-2.0. Its
+licence and provenance are recorded in that directory. Nothing this project
+ships depends on it.
