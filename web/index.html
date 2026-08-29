@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hnsw-cpp — approximate nearest neighbours in the browser</title>
+<style>
+  :root {
+    --ink: #17150f;
+    --dim: #6b6558;
+    --rule: #ddd6c6;
+    --paper: #fbfaf6;
+    --card: #fffefb;
+    --exact: #7a4a1e;
+    --graph: #1c5545;
+    --warn: #8a2d2d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1.5rem 4rem;
+    background: var(--paper); color: var(--ink);
+    font: 16px/1.6 Charter, Georgia, "Times New Roman", serif;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { font-size: 1.9rem; margin: 0 0 .2rem; letter-spacing: -.01em; }
+  .sub { color: var(--dim); margin: 0 0 2rem; font-size: 1.02rem; }
+  h2 {
+    font-size: .78rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--dim); font-weight: 600; margin: 2.2rem 0 .8rem;
+    border-bottom: 1px solid var(--rule); padding-bottom: .4rem;
+  }
+  code, .num, table { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: end; }
+  label { display: block; font-size: .74rem; text-transform: uppercase;
+          letter-spacing: .07em; color: var(--dim); margin-bottom: .35rem; }
+  select, input[type=range] { font: inherit; }
+  select {
+    font-family: ui-monospace, Menlo, monospace; font-size: .95rem;
+    padding: .35rem .5rem; border: 1px solid var(--rule);
+    background: var(--card); color: var(--ink); border-radius: 3px;
+  }
+  input[type=range] { width: 14rem; accent-color: var(--graph); }
+  button {
+    font: inherit; padding: .5rem 1.15rem; cursor: pointer;
+    background: var(--ink); color: var(--paper);
+    border: 0; border-radius: 3px;
+  }
+  button:disabled { opacity: .4; cursor: default; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+           gap: .9rem; margin-top: .3rem; }
+  .card { background: var(--card); border: 1px solid var(--rule);
+          border-radius: 4px; padding: .85rem 1rem; }
+  .card .k { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em;
+             color: var(--dim); }
+  .card .v { font-family: ui-monospace, Menlo, monospace;
+             font-size: 1.5rem; margin-top: .2rem; font-variant-numeric: tabular-nums; }
+  .graph .v { color: var(--graph); }
+  .exact .v { color: var(--exact); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .87rem; margin-top: .3rem; }
+  th, td { text-align: right; padding: .34rem .5rem; border-bottom: 1px solid var(--rule); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+       color: var(--dim); font-weight: 600; }
+  td { font-variant-numeric: tabular-nums; }
+  tr.hit td:first-child::before { content: "\2713 "; color: var(--graph); }
+  tr.miss td:first-child::before { content: "\00d7 "; color: var(--warn); }
+  .note { color: var(--dim); font-size: .9rem; }
+  .status { font-family: ui-monospace, Menlo, monospace; font-size: .85rem; color: var(--dim); }
+  a { color: var(--graph); }
+</style>
+</head>
+<body>
+<main>
+  <h1>hnsw-cpp</h1>
+  <p class="sub">
+    The search half of the index, compiled to WebAssembly. Everything below runs
+    in this tab against 10,000 SIFT vectors &mdash; no server answers any of it.
+  </p>
+
+  <p class="status" id="status">loading the module&hellip;</p>
+
+  <h2>Query</h2>
+  <div class="controls">
+    <div>
+      <label for="q">query vector</label>
+      <select id="q" disabled></select>
+    </div>
+    <div>
+      <label for="ef">ef search &mdash; <span class="num" id="efv">64</span></label>
+      <input type="range" id="ef" min="10" max="400" step="10" value="64" disabled>
+    </div>
+    <div>
+      <label for="k">k</label>
+      <select id="k" disabled>
+        <option>10</option><option>20</option><option>50</option><option>100</option>
+      </select>
+    </div>
+    <button id="run" disabled>Search</button>
+  </div>
+
+  <h2>Graph search versus exhaustive search</h2>
+  <div class="cards">
+    <div class="card graph"><div class="k">HNSW</div><div class="v" id="tg">&mdash;</div></div>
+    <div class="card exact"><div class="k">brute force</div><div class="v" id="tb">&mdash;</div></div>
+    <div class="card"><div class="k">speedup</div><div class="v" id="sp">&mdash;</div></div>
+    <div class="card"><div class="k">recall@k</div><div class="v" id="rc">&mdash;</div></div>
+  </div>
+  <p class="note" id="explain">
+    Recall is measured against the ground truth that ships with the dataset,
+    computed by exhaustive search, not against this page's own answer.
+  </p>
+
+  <h2>Neighbours returned</h2>
+  <table>
+    <thead><tr><th>rank</th><th>id</th><th>distance</th><th>exact id</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="4" class="note">run a search</td></tr></tbody>
+  </table>
+
+  <h2>What is actually happening</h2>
+  <p class="note">
+    The graph, the vectors and the beam search are the same C++ that the command
+    line tool uses; only the entry points differ. The index was built offline and
+    is fetched here as one 6.3&nbsp;MB buffer, which the search reads in place.
+    Building an index is a minutes-long job and is deliberately not compiled in.
+    Source on <a href="https://github.com/g-charan/hnsw-cpp">GitHub</a>.
+  </p>
+</main>
+
+<script src="./hnsw.js"></script>
+<script>
+(async function () {
+  const $ = id => document.getElementById(id);
+  const status = $("status");
+  const say = t => { status.textContent = t; };
+
+  // .fvecs and .ivecs are the same shape: a little-endian int32 dimension,
+  // then that many values, repeated to the end of the file.
+  function readVecs(buf, Kind) {
+    const dv = new DataView(buf), out = [];
+    let off = 0;
+    while (off < buf.byteLength) {
+      const d = dv.getInt32(off, true); off += 4;
+      out.push(new Kind(buf.slice(off, off + d * 4)));
+      off += d * 4;
+    }
+    return out;
+  }
+
+  let Module, queries, truth, loaded = 0;
+
+  try {
+    say("loading the module…");
+    Module = await createHnswModule();
+
+    say("fetching the index (6.3 MB)…");
+    const [idxBuf, qBuf, gtBuf] = await Promise.all([
+      fetch("./small.idx").then(r => r.arrayBuffer()),
+      fetch("./queries.fvecs").then(r => r.arrayBuffer()),
+      fetch("./groundtruth.ivecs").then(r => r.arrayBuffer()),
+    ]);
+
+    queries = readVecs(qBuf, Float32Array);
+    truth = readVecs(gtBuf, Int32Array);
+
+    const bytes = new Uint8Array(idxBuf);
+    const p = Module._malloc(bytes.length);
+    Module.HEAPU8.set(bytes, p);
+    loaded = Module._hnsw_load(p, bytes.length);
+    Module._free(p);
+    if (!loaded) throw new Error("the index failed to load");
+
+    const n = Module._hnsw_count(), dim = Module._hnsw_dim();
+    say(`${n.toLocaleString()} vectors × ${dim} dimensions, ${queries.length} held-out queries`);
+
+    const q = $("q");
+    q.innerHTML = queries.map((_, i) => `<option value="${i}">query ${i}</option>`).join("");
+    for (const el of [q, $("ef"), $("k"), $("run")]) el.disabled = false;
+  } catch (e) {
+    say("could not start: " + e.message);
+    return;
+  }
+
+  $("ef").addEventListener("input", e => { $("efv").textContent = e.target.value; });
+
+  $("run").addEventListener("click", () => {
+    const qi = +$("q").value, k = +$("k").value, ef = +$("ef").value;
+    const query = queries[qi];
+
+    const qp = Module._malloc(query.length * 4);
+    Module.HEAPF32.set(query, qp / 4);
+
+    const ng = Module._hnsw_search(qp, k, ef);
+    const tg = Module._hnsw_last_us();
+    const gIds = Module.HEAPU32.slice(Module._hnsw_ids() / 4, Module._hnsw_ids() / 4 + ng);
+    const gD = Module.HEAPF32.slice(Module._hnsw_dists() / 4, Module._hnsw_dists() / 4 + ng);
+
+    const nb = Module._hnsw_search_bruteforce(qp, k);
+    const tb = Module._hnsw_last_us();
+    const bIds = Module.HEAPU32.slice(Module._hnsw_ids() / 4, Module._hnsw_ids() / 4 + nb);
+    Module._free(qp);
+
+    // Ground truth ships top-100 per query; compare against its first k.
+    const exact = new Set(Array.from(truth[qi]).slice(0, k));
+    const hits = Array.from(gIds).filter(id => exact.has(id)).length;
+
+    const us = v => v < 1000 ? `${v.toFixed(0)} µs` : `${(v / 1000).toFixed(2)} ms`;
+    $("tg").textContent = us(tg);
+    $("tb").textContent = us(tb);
+    $("sp").textContent = tg > 0 ? `${(tb / tg).toFixed(1)}×` : "—";
+    $("rc").textContent = `${(hits / k * 100).toFixed(0)}%`;
+
+    $("rows").innerHTML = Array.from(gIds).map((id, i) => `
+      <tr class="${exact.has(id) ? "hit" : "miss"}">
+        <td>${i + 1}</td><td>${id}</td>
+        <td>${gD[i].toFixed(1)}</td><td>${bIds[i]}</td>
+      </tr>`).join("");
+  });
+
+  $("run").click();
+})();
+</script>
+</body>
+</html>

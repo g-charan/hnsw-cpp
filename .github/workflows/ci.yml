@@ -16,3 +16,44 @@ jobs:
       - run: ./tools/get_dataset.sh siftsmall
         continue-on-error: true
       - run: ctest --test-dir build --output-on-failure --no-tests=error
+
+  # Builds the browser demo: the index offline with the native tool, the search
+  # path to WebAssembly, and the dataset's own query and ground truth files so
+  # the page can score its recall against something it did not compute itself.
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      # The corpus is only reachable over FTP and runners sometimes block it.
+      # Cached, only the first run after a miss depends on that holding up; a
+      # run that cannot fetch fails without taking the published site down.
+      - uses: actions/cache@v4
+        with:
+          path: data/siftsmall
+          key: siftsmall-v1
+      - run: ./tools/get_dataset.sh siftsmall
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build -j
+      - run: ./build/cli/hnsw build data/siftsmall/siftsmall_base.fvecs small.idx
+      - uses: mymindstorm/setup-emsdk@v14
+      - run: ./wasm/build.sh site
+      - name: assemble the site
+        run: |
+          cp web/index.html small.idx site/
+          cp data/siftsmall/siftsmall_query.fvecs site/queries.fvecs
+          cp data/siftsmall/siftsmall_groundtruth.ivecs site/groundtruth.ivecs
+          ls -la site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: pages
+        uses: actions/deploy-pages@v4
