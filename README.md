@@ -41,6 +41,26 @@ ctest --test-dir build --output-on-failure
 `./tools/get_dataset.sh sift` fetches the full SIFT1M set (~160 MB) used for the
 numbers below.
 
+## From Python
+
+```bash
+pip install ./python        # or: pip install "git+https://github.com/g-charan/hnsw-cpp#subdirectory=python"
+```
+
+```python
+import numpy as np, hnsw_cpp
+
+idx = hnsw_cpp.Index(dim=384, capacity=100_000, metric="ip")  # "ip" = 1 - dot, cosine on unit vectors
+idx.add(vectors)                                              # float32 (n, dim)
+ids, dists = idx.search_many(queries, k=10, ef=100)           # (q, k) each
+idx.save("corpus.idx")
+idx = hnsw_cpp.Index.load("corpus.idx")                       # mmap, read-only, opens in microseconds
+```
+
+The binding is one pybind11 file over the same headers; it releases the GIL
+around search, so threads in a Python server share one index. `python/tests`
+scores it against a brute-force numpy answer.
+
 ## Benchmarks
 
 Every figure comes from a benchmark target in this repository, on an Apple M4
