@@ -6,7 +6,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$root/build/wasm}"
 mkdir -p "$out"
 
-emcc "$root/wasm/bindings.cpp" \
+em++ "$root/wasm/bindings.cpp" \
   -I"$root/include" \
   -O3 -std=c++23 \
   -msimd128 \
