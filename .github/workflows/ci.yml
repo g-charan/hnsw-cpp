@@ -16,6 +16,13 @@ jobs:
       - run: ./tools/get_dataset.sh siftsmall
         continue-on-error: true
       - run: ctest --test-dir build --output-on-failure --no-tests=error
+      # The Python binding compiles the same headers through pybind11. Same
+      # caveat as above: an x86 runner exercises the scalar kernels only.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy pytest ./python
+      - run: python -m pytest python/tests -q
 
   # Builds the browser demo: the index offline with the native tool, the search
   # path to WebAssembly, and the dataset's own query and ground truth files so
