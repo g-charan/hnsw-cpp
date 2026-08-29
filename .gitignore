@@ -4,3 +4,7 @@ data/
 *.bin
 *.idx
 .DS_Store
+python/build/
+python/*.egg-info/
+*.so
+__pycache__/
